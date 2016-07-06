@@ -12,8 +12,8 @@ from shapely.geometry import MultiPoint, MultiLineString, MultiPolygon
 from shapely.geometry.polygon import LinearRing
 
 
-DEBUG=False
-#DEBUG=True
+#DEBUG=False
+DEBUG=True
 
 def write_osm_xml(out_file,nodes,lines):
 	f=open(out_file,"w+")
@@ -57,21 +57,20 @@ def write_osm_xml(out_file,nodes,lines):
 
 def print_help():
 	os.write(2,"""
-This is parsing OSM programm. 
-	This programm change input file by rules file and save result to output file. 
+This is convertor kml->osm
+	This programm read kml-file (Google Earth geo-data) and write osm-file (OpenStreetMap xml)
 	Use:            
-		%(script_name)s -r rules.xml -i input.osm -o out.osm 
+		kml2osm -i in.kml -o out.osm
 
 options: 
-	-r file - file with xml-rules 
-	-i file - input file with osm 
-	-o file - output file with osm, where programm save result 
+	-i file - input file with kml 
+	-o file - output file with osm
 	-d - debug output
 	-h - this help
-need 3 parametr: rules-file, input and output files.
+need 2 parametr: input and output files.
 Use -h for help.
 exit!
-""" % {"script_name":sys.argv[0]})
+""")
 
 def parse_opts():
 	inputfile = ''
@@ -232,7 +231,8 @@ for f1 in k.features():
 										if id_node == None:
 											print("ERROR find Point in nodes! (%f,%f)" % (list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y) )
 										else:
-											l["nodes"].append(id_node)
+											if id_node not in l["nodes"]:
+												l["nodes"].append(id_node)
 									add_flag=True
 								# Последняя точка линии kml совпадает с последней точкой в линии:
 								if nodes[l_last_node_id].lat==last_point_kml_line.x and nodes[l_last_node_id].lon == last_point_kml_line.y:
@@ -242,7 +242,8 @@ for f1 in k.features():
 										if id_node == None:
 											print("ERROR find Point in nodes! (%f,%f)" % (list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y) )
 										else:
-											l["nodes"].append(id_node)
+											if id_node not in l["nodes"]:
+												l["nodes"].append(id_node)
 									add_flag=True
 	
 								# Первая точка линии kml совпадает с первой точкой в линии:
@@ -253,7 +254,8 @@ for f1 in k.features():
 										if id_node == None:
 											print("ERROR find Point in nodes! (%f,%f)" % (list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y) )
 										else:
-											l["nodes"].insert(0,id_node)
+											if id_node not in l["nodes"]:
+												l["nodes"].insert(0,id_node)
 									add_flag=True
 								# Последняя точка линии kml совпадает с первой точкой в линии:
 								if nodes[l_fist_node_id].lat==last_point_kml_line.x and nodes[l_fist_node_id].lon == last_point_kml_line.y:
@@ -263,7 +265,8 @@ for f1 in k.features():
 										if id_node == None:
 											print("ERROR find Point in nodes! (%f,%f)" % (list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y) )
 										else:
-											l["nodes"].insert(0,id_node)
+											if id_node not in l["nodes"]:
+												l["nodes"].insert(0,id_node)
 									add_flag=True
 						if add_flag==False:
 							# Тогда добавляем в нашу новую линию:
@@ -272,7 +275,8 @@ for f1 in k.features():
 								if id_node == None:
 									print("ERROR find Point in nodes! (%f,%f)" % (Point(p).x, Point(p).y))
 								else:
-									line["nodes"].append(id_node)
+									if id_node not in line["nodes"]:
+										line["nodes"].append(id_node)
 
 				if len(line["nodes"])>0:
 					line["id"]=current_way_id
