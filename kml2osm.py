@@ -175,6 +175,24 @@ for f1 in k.features():
 						node["lat"]=float(f5.geometry.y)
 						tags["id"]=current_node_id
 
+#					print("f5: ",f5.etree_element())
+						if "Point" in f5.etree_element().keys():
+							print("found Point: ", f5.etree_element.get("Point"))
+						for tag in f5.etree_element():
+							print("tag: '%s'" % tag.tag)
+								
+#						sys.exit(0)
+
+
+#					if int(f5.LookAt.range) == 1000:
+#							# кабельная линия
+#							#tags["power"]="link"
+#							node["type"]="kl"
+#						elif int(f5.range) == 1030:
+#							# воздушная линия
+#							tags["power"]="tower"
+#							node["type"]="vl"
+	
 						tags["ref"]=f5.name
 						tags["voltage"]=voltage*1000
 						tags["source"]="survey"
@@ -201,9 +219,15 @@ for f1 in k.features():
 					if f5.geometry.geom_type == "LineString":
 						num_points_in_kml_line=len(list(f5.geometry.coords))
 # Берём первую точку в линии:
-						first_point_kml_line=Point( list(f5.geometry.coords)[0] )
+						first_point_kml_line=find_node_by_coord(nodes,Point(list(f5.geometry.coords)[0]).x, Point(list(f5.geometry.coords)[0]).y  )
+						if first_point_kml_line == None:
+							print("ERROR find Point in nodes! (%f,%f)" % (Point(list(f5.geometry.coords)[0]).x, Point(list(f5.geometry.coords)[0]).y) )
+							continue
 # Берём последнюю точку в линии:
-						last_point_kml_line=Point( list(f5.geometry.coords)[num_points_in_kml_line-1] )
+						last_point_kml_line=find_node_by_coord(nodes, Point(list(f5.geometry.coords)[num_points_in_kml_line-1]).x, Point(list(f5.geometry.coords)[num_points_in_kml_line-1]).y  )
+						if last_point_kml_line == None:
+							print("ERROR find Point in nodes! (%f,%f)" % (Point(list(f5.geometry.coords)[num_points_in_kml_line-1]).x, Point(list(f5.geometry.coords)[num_points_in_kml_line-1]).y) )
+							continue
 # Перебираем существующие линии с таким именем:
 						add_flag=False
 						for l in lines:
@@ -224,7 +248,7 @@ for f1 in k.features():
 								#Проверяем, можно ли добавить наш кусочик из kml в начало или конец этой линии:
 
 								# Первая точка линии kml совпадает с последней точкой в линии:
-								if nodes[l_last_node_id].lat==first_point_kml_line.x and nodes[l_last_node_id].lon == first_point_kml_line.y:
+								if nodes[l_last_node_id]["lat"]==first_point_kml_line["lat"] and nodes[l_last_node_id].lon == first_point_kml_line["lon"] and l["type"] == first_point_kml_line["type"]:
 									# Просто добавляем в конец все точки из kml:
 									for i in range(1,num_points_in_kml_line-1):
 										id_node=find_node_by_coord(nodes, list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y )
@@ -235,7 +259,7 @@ for f1 in k.features():
 												l["nodes"].append(id_node)
 									add_flag=True
 								# Последняя точка линии kml совпадает с последней точкой в линии:
-								if nodes[l_last_node_id].lat==last_point_kml_line.x and nodes[l_last_node_id].lon == last_point_kml_line.y:
+								if nodes[l_last_node_id]["lat"]==last_point_kml_line["lat"] and nodes[l_last_node_id]["lon"] == last_point_kml_line["lon"] and l["type"] == last_point_kml_line["type"]:
 									# добавляем в конец все точки из kml (наоборот, от предпоследней к первой):
 									for i in range(num_points_in_kml_line-2,0):
 										id_node=find_node_by_coord(nodes, list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y )
@@ -247,7 +271,7 @@ for f1 in k.features():
 									add_flag=True
 	
 								# Первая точка линии kml совпадает с первой точкой в линии:
-								if nodes[l_fist_node_id].lat==first_point_kml_line.x and nodes[l_fist_node_id].lon == first_point_kml_line.y:
+								if nodes[l_fist_node_id]["lat"]==first_point_kml_line["lat"] and nodes[l_fist_node_id]["lon"] == first_point_kml_line["lon"] and l["type"] == first_point_kml_line["type"]:
 									# Вставляем:
 									for i in range(1,num_points_in_kml_line-1):
 										id_node=find_node_by_coord(nodes, list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y )
@@ -258,7 +282,7 @@ for f1 in k.features():
 												l["nodes"].insert(0,id_node)
 									add_flag=True
 								# Последняя точка линии kml совпадает с первой точкой в линии:
-								if nodes[l_fist_node_id].lat==last_point_kml_line.x and nodes[l_fist_node_id].lon == last_point_kml_line.y:
+								if nodes[l_fist_node_id]["lat"]==last_point_kml_line["lat"] and nodes[l_fist_node_id]["lon"] == last_point_kml_line["lon"] and l["type"] == last_point_kml_line["type"]:
 									# Вставляем "наоборот":
 									for i in range(num_points_in_kml_line-2,0):
 										id_node=find_node_by_coord(nodes, list(f5.geometry.coords)[i].x, list(f5.geometry.coords)[i].y )
@@ -276,12 +300,34 @@ for f1 in k.features():
 									print("ERROR find Point in nodes! (%f,%f)" % (Point(p).x, Point(p).y))
 								else:
 									if id_node not in line["nodes"]:
+# Если тип не установлен (новая линия без точек:)
+										if "type" not in line:
+											# ставим тип из первой точки:
+											line["type"]=nodes[id_node]["type"]
+										else:
+											# линия уже имеет тип, а значит и точки:
+											if line["type"]!=nodes[id_node]["type"]:
+												#линия имеет другой тип, чем новая точка. Нужно "закрыть" текущую линию и добавить новую и в новую уже добавить эту точку:
+												line["id"]=current_way_id
+												lines[current_way_id]=line
+# Создаём новую линию:
+												line={}
+												tags={}
+												tags["name"]=f4.name
+												tags["voltage"]=voltage*1000
+												tags["source"]="survey"
+												tags["source:note"]=f1.name
+												line["name"]=tags["name"]
+												line["tags"]=tags
+												line["nodes"]=[]
+												line["type"]=nodes[id_node]["type"]
+												current_way_id-=1
 										line["nodes"].append(id_node)
 
 				if len(line["nodes"])>0:
 					line["id"]=current_way_id
+					lines[current_way_id]=line
 					current_way_id-=1
-					lines[current_node_id]=line
 
 write_osm_xml(out_file,nodes,lines)
 
