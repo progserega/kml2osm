@@ -157,7 +157,13 @@ def process_point(p,ns,nodes,line_name,note):
 				node["type"]="vl"
 			else:
 				node["type"]="kl"
-	tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+	if DEBUG:
+		print("DEBUG: line_name: ",line_name)
+	try:
+		tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+	except:
+		print("DEBUG: can not find voltage in '%s'" % line_name)
+		
 	tags["source"]="survey"
 	tags["source:note"]=note
 	tags["note"]=line_name
@@ -172,7 +178,13 @@ def process_line(p,ns,nodes,lines,line_name,note):
 	line={}
 	tags={}
 	tags["name"]=line_name
-	tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+	if DEBUG:
+		print("DEBUG: line_name: ",line_name)
+	try:
+		tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+	except:
+		print("DEBUG: can not find voltage in '%s'" % line_name)
+	
 	tags["source"]="survey"
 	tags["source:note"]=note
 	line["name"]=tags["name"]
@@ -195,6 +207,8 @@ def process_line(p,ns,nodes,lines,line_name,note):
 	points=[]
 	for coord in coords:
 		point={}
+		if DEBUG:
+			print("DEBUG: coord: %s" % coord)
 		point["lon"]=coord.split(",")[0]
 		point["lat"]=coord.split(",")[1]
 		point["ele"]=coord.split(",")[2]
