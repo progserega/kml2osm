@@ -164,6 +164,27 @@ def process_point(p,ns,nodes,line_name,note):
 	except:
 		print("DEBUG: can not find voltage in '%s'" % line_name)
 		
+	if node["type"]=="vl":
+		tags["power"]="tower"
+	elif node["type"]=="kl":
+		if "ref" in tags:
+			if "КМ" in tags["ref"]:
+				# концевая муфта:
+				tags["power"]="link"
+				tags["link"]="end_connection"
+			elif "ТМ" in tags["ref"]:
+				# транспозиционная муфта: 
+				tags["power"]="link"
+				tags["link"]="connection"
+			elif "СМ" in tags["ref"]:
+				# соединительная муфта:
+				tags["power"]="link"
+				tags["link"]="connection"
+			elif "РМ" in tags["ref"]:
+				# ?? муфта:
+				tags["power"]="link"
+				tags["link"]="connection"
+		
 	tags["source"]="survey"
 	tags["source:note"]=note
 	tags["note"]=line_name
@@ -222,7 +243,9 @@ def process_line(p,ns,nodes,lines,line_name,note):
 		if DEBUG:
 			print("DEBUG: append point:", point)
 	# Запускаем функцию добавления LineString в существующие линии или в новую:
-	append_line_to_lines(line,points,nodes,lines)
+	if append_line_to_lines(line,points,nodes,lines) == False:
+		print("ERROR append_line_to_lines()")
+		return False
 
 def append_line_to_lines(line,points,nodes,lines):
 	global current_way_id
@@ -230,8 +253,10 @@ def append_line_to_lines(line,points,nodes,lines):
 	# Берём первую точку в линии:
 	first_point_kml_line_id=find_node_by_coord(nodes,points[0]["lon"], points[0]["lat"] )
 	if first_point_kml_line_id == None:
+		print("ERROR find Point in nodes!")
+		print("points[0]=", points[0])
 		print("ERROR find Point in nodes! (%f,%f)" % (\
-					nodes,points[0]["lon"], points[0]["lat"] ))
+					points[0]["lon"], points[0]["lat"] ))
 		return False
 	first_point_kml_line = nodes[first_point_kml_line_id]
 	# Берём последнюю точку в линии:
@@ -279,18 +304,32 @@ def append_line_to_lines(line,points,nodes,lines):
 			# Первая точка линии kml совпадает с последней точкой в линии:
 			if l_last_node["lat"]==first_point_kml_line["lat"] and l_last_node["lon"] == first_point_kml_line["lon"] and l["type"] == first_point_kml_line["type"]:
 				# Просто добавляем в конец все точки из kml:
-				for i in range(1,num_points_in_kml_line-1):
+				if DEBUG:
+					print("DEBUG: Первая точка линии kml совпадает с последней точкой в линии:")
+					print("range=",range(1,num_points_in_kml_line))
+					
+				for i in range(1,num_points_in_kml_line):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
+					if DEBUG:
+						print("DEBUG: find node id:",id_node)
 					if id_node == None:
 						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
 					else:
+						if DEBUG:
+							print("DEBUG: try add node[%d] to line[%d]" % (id_node, l["id"]))
 						if id_node not in l["nodes"]:
 							l["nodes"].append(id_node)
+						else:
+							if DEBUG:
+								print("DEBUG: id_node=%d уже в линии с id=%d" % (id_node,l["id"]))
+
 				add_flag=True
 			# Последняя точка линии kml совпадает с последней точкой в линии:
 			if l_last_node["lat"]==last_point_kml_line["lat"] and l_last_node["lon"] == last_point_kml_line["lon"] and l["type"] == last_point_kml_line["type"]:
+				if DEBUG:
+					print("DEBUG: Последняя точка линии kml совпадает с последней точкой в линии")
 				# добавляем в конец все точки из kml (наоборот, от предпоследней к первой):
-				for i in range(num_points_in_kml_line-2,0):
+				for i in range(num_points_in_kml_line-2,-1,-1):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
 						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
@@ -301,8 +340,10 @@ def append_line_to_lines(line,points,nodes,lines):
 
 			# Первая точка линии kml совпадает с первой точкой в линии:
 			if l_fist_node["lat"]==first_point_kml_line["lat"] and l_fist_node["lon"] == first_point_kml_line["lon"] and l["type"] == first_point_kml_line["type"]:
+				if DEBUG:
+					print("DEBUG: Первая точка линии kml совпадает с первой точкой в линии")
 				# Вставляем:
-				for i in range(1,num_points_in_kml_line-1):
+				for i in range(1,num_points_in_kml_line):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
 						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
@@ -312,8 +353,10 @@ def append_line_to_lines(line,points,nodes,lines):
 				add_flag=True
 			# Последняя точка линии kml совпадает с первой точкой в линии:
 			if l_fist_node["lat"]==last_point_kml_line["lat"] and l_fist_node["lon"] == last_point_kml_line["lon"] and l["type"] == last_point_kml_line["type"]:
+				if DEBUG:
+					print("DEBUG: Последняя точка линии kml совпадает с первой точкой в линии")
 				# Вставляем "наоборот":
-				for i in range(num_points_in_kml_line-2,0):
+				for i in range(num_points_in_kml_line-2,-1,-1):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
 						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
@@ -323,6 +366,8 @@ def append_line_to_lines(line,points,nodes,lines):
 				add_flag=True
 	if add_flag==False:
 		# Тогда добавляем в нашу новую линию:
+		if DEBUG:
+			print("DEBUG: Тогда добавляем в нашу новую линию")
 		for p in points:
 			id_node=find_node_by_coord(nodes, p["lon"], p["lat"])
 			if id_node == None:
@@ -333,10 +378,16 @@ def append_line_to_lines(line,points,nodes,lines):
 					if "type" not in line:
 						# ставим тип из первой точки:
 						line["type"]=nodes[id_node]["type"]
+						if line["type"]=="kl":
+							line["tags"]["power"]="cable"
+						elif line["type"]=="vl":
+							line["tags"]["power"]="line"
 					else:
 						# линия уже имеет тип, а значит и точки:
 						if line["type"]!=nodes[id_node]["type"]:
 							#линия имеет другой тип, чем новая точка. Нужно "закрыть" текущую линию и добавить новую и в новую уже добавить эту точку:
+							if DEBUG:
+								print("DEBUG: линия имеет другой тип, чем новая точка. Нужно 'закрыть' текущую линию и добавить новую и в новую уже добавить эту точку")
 							# перед этим копируем нужные теги:
 							tags={}
 							tags["name"]=line["tags"]["name"]
@@ -355,10 +406,14 @@ def append_line_to_lines(line,points,nodes,lines):
 							line["nodes"]=[]
 							line["type"]=nodes[id_node]["type"]
 							current_way_id-=1
+					if DEBUG:
+						print("DEBUG: append node[%d] to line[new_line]" % (id_node))
 					line["nodes"].append(id_node)
 
 	if len(line["nodes"])>0:
 		line["id"]=current_way_id
+		if DEBUG:
+			print("DEBUG: append line[%d] to lines" % current_way_id)
 		lines[current_way_id]=line
 		current_way_id-=1
 	return True
