@@ -29,8 +29,8 @@ def write_osm_xml(out_file,nodes,lines):
 		tags=node["tags"]
 		f.write("	<node id='%(id)d' action='modify' visible='true' lat='%(lat)f' lon='%(lon)f' >\n" % {\
 				"id":node_id,\
-				"lat":node["lat"],\
-				"lon":node["lon"],\
+				"lat":float(node["lat"]),\
+				"lon":float(node["lon"]),\
 				})
 		for k in tags:
 			f.write("		<tag k='%(key)s' v='%(value)s' />\n" % {"key":k, "value":tags[k]})
@@ -66,6 +66,7 @@ This is convertor kml->osm
 options: 
 	-i file - input file with kml 
 	-o file - output file with osm
+	-n tag source_note_extra tag
 	-d - debug output
 	-h - this help
 need 2 parametr: input and output files.
@@ -77,7 +78,7 @@ def parse_opts():
 	inputfile = ''
 	outputfile = ''
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"hdr:i:o:",["help","debug","rules=","infile=","outfile="])
+		opts, args = getopt.getopt(sys.argv[1:],"hdr:i:o:n:s:",["help","debug","rules=","infile=","outfile=","source_note_extra=","source="])
 	except getopt.GetoptError as err:
 		os.write(2, str(err) ) # will print something like "option -a not recognized"
 		print_help()
@@ -93,6 +94,12 @@ def parse_opts():
 		elif opt in ("-o", "--outfile"):
 			global out_file
 			out_file = arg
+		elif opt in ("-n", "--source_note_extra"):
+			global source_note_extra
+			source_note_extra = arg
+		elif opt in ("-s", "--source"):
+			global source_tag
+			source_tag = arg
 		elif opt in ("-d", "--debug"):
 			global DEBUG 
 			DEBUG = True
@@ -115,7 +122,7 @@ def process_folder(root,ns,nodes,lines,note):
 		process_placemark_lines(folder,ns,nodes,lines,folder_name,note)
 
 		# Погружаемся на уровень ниже:
-		process_folder(folder,ns,nodes,lines,note)
+		process_folder(folder,ns,nodes,lines,folder_name)
 
 def process_placemark_points(root,ns,nodes,lines,line_name,note):
 	for p in root.findall(ns+"Placemark"):
@@ -130,6 +137,8 @@ def process_placemark_lines(root,ns,nodes,lines,line_name,note):
 			process_line(p,ns,nodes,lines,line_name,note)
 
 def process_point(p,ns,nodes,line_name,note):
+	global source_tag
+	global source_note_extra
 	global current_node_id
 	node={}
 	tags={}
@@ -145,9 +154,9 @@ def process_point(p,ns,nodes,line_name,note):
 	if coord==None:
 		print("ERROR find coordinates in process_point()!")
 		return False
-	node["lon"]=float(coord.text.split(",")[0])
-	node["lat"]=float(coord.text.split(",")[1])
-	tags["ele"]=float(coord.text.split(",")[2])
+	node["lon"]=coord.text.split(",")[0]
+	node["lat"]=coord.text.split(",")[1]
+	tags["ele"]=coord.text.split(",")[2]
 	lookAt=p.find(ns+"LookAt")
 	if lookAt!=None:
 		range_tag=lookAt.find(ns+"range")
@@ -160,9 +169,9 @@ def process_point(p,ns,nodes,line_name,note):
 	if DEBUG:
 		print("DEBUG: line_name: ",line_name)
 	try:
-		tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+		tags["voltage"]=int(note.split("кВ")[0].split("ВЛ")[1])*1000
 	except:
-		print("DEBUG: can not find voltage in '%s'" % line_name)
+		print("DEBUG: can not find voltage in '%s'" % note)
 		
 	if node["type"]=="vl":
 		tags["power"]="tower"
@@ -185,8 +194,8 @@ def process_point(p,ns,nodes,line_name,note):
 				tags["power"]="link"
 				tags["link"]="connection"
 		
-	tags["source"]="survey"
-	tags["source:note"]=note
+	tags["source"]=source_tag
+	tags["source:note"]=note+source_note_extra
 	tags["note"]=line_name
 	node["tags"]=tags
 	node["id"]=current_node_id
@@ -195,6 +204,8 @@ def process_point(p,ns,nodes,line_name,note):
 	return True
 		
 def process_line(p,ns,nodes,lines,line_name,note):
+	global source_note_extra
+	global source_tag
 	name=""
 	line={}
 	tags={}
@@ -202,12 +213,12 @@ def process_line(p,ns,nodes,lines,line_name,note):
 	if DEBUG:
 		print("DEBUG: line_name: ",line_name)
 	try:
-		tags["voltage"]=int(line_name.split("кВ")[0].split("ВЛ")[1])*1000
+		tags["voltage"]=int(note.split("кВ")[0].split("ВЛ")[1])*1000
 	except:
-		print("DEBUG: can not find voltage in '%s'" % line_name)
+		print("DEBUG: can not find voltage in '%s'" % note)
 	
-	tags["source"]="survey"
-	tags["source:note"]=note
+	tags["source"]=source_tag
+	tags["source:note"]=note+source_note_extra
 	line["name"]=tags["name"]
 	line["tags"]=tags
 	line["nodes"]=[]
@@ -232,13 +243,13 @@ def process_line(p,ns,nodes,lines,line_name,note):
 	for coord in coords:
 		point={}
 		if coord=='':
-			print("ERROR coord=''")
+			#print("ERROR coord=''")
 			continue
 		if DEBUG:
 			print("DEBUG: coord: '%s'" % coord)
-		point["lon"]=float(coord.split(",")[0])
-		point["lat"]=float(coord.split(",")[1])
-		point["ele"]=float(coord.split(",")[2])
+		point["lon"]=coord.split(",")[0]
+		point["lat"]=coord.split(",")[1]
+		point["ele"]=coord.split(",")[2]
 		points.append(point)
 		if DEBUG:
 			print("DEBUG: append point:", point)
@@ -255,7 +266,7 @@ def append_line_to_lines(line,points,nodes,lines):
 	if first_point_kml_line_id == None:
 		print("ERROR find Point in nodes!")
 		print("points[0]=", points[0])
-		print("ERROR find Point in nodes! (%f,%f)" % (\
+		print("ERROR find Point in nodes! (%s,%s)" % (\
 					points[0]["lon"], points[0]["lat"] ))
 		return False
 	first_point_kml_line = nodes[first_point_kml_line_id]
@@ -264,7 +275,7 @@ def append_line_to_lines(line,points,nodes,lines):
 			points[num_points_in_kml_line-1]["lon"],\
 			points[num_points_in_kml_line-1]["lat"])
 	if last_point_kml_line_id == None:
-		print("ERROR find Point in nodes! (%f,%f)" % (\
+		print("ERROR find Point in nodes! (%s,%s)" % (\
 			points[num_points_in_kml_line-1]["lon"],\
 			points[num_points_in_kml_line-1]["lat"]))
 		return False
@@ -313,7 +324,7 @@ def append_line_to_lines(line,points,nodes,lines):
 					if DEBUG:
 						print("DEBUG: find node id:",id_node)
 					if id_node == None:
-						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
+						print("ERROR find Point in nodes! (%s,%s)" % (points[i]["lon"], points[i]["lat"] ))
 					else:
 						if DEBUG:
 							print("DEBUG: try add node[%d] to line[%d]" % (id_node, l["id"]))
@@ -332,7 +343,7 @@ def append_line_to_lines(line,points,nodes,lines):
 				for i in range(num_points_in_kml_line-2,-1,-1):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
-						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
+						print("ERROR find Point in nodes! (%s,%s)" % (points[i]["lon"], points[i]["lat"] ))
 					else:
 						if id_node not in l["nodes"]:
 							l["nodes"].append(id_node)
@@ -346,7 +357,7 @@ def append_line_to_lines(line,points,nodes,lines):
 				for i in range(1,num_points_in_kml_line):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
-						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
+						print("ERROR find Point in nodes! (%s,%s)" % (points[i]["lon"], points[i]["lat"] ))
 					else:
 						if id_node not in l["nodes"]:
 							l["nodes"].insert(0,id_node)
@@ -359,7 +370,7 @@ def append_line_to_lines(line,points,nodes,lines):
 				for i in range(num_points_in_kml_line-2,-1,-1):
 					id_node=find_node_by_coord(nodes, points[i]["lon"], points[i]["lat"] )
 					if id_node == None:
-						print("ERROR find Point in nodes! (%f,%f)" % (points[i]["lon"], points[i]["lat"] ))
+						print("ERROR find Point in nodes! (%s,%s)" % (points[i]["lon"], points[i]["lat"] ))
 					else:
 						if id_node not in l["nodes"]:
 							l["nodes"].insert(0,id_node)
@@ -371,7 +382,7 @@ def append_line_to_lines(line,points,nodes,lines):
 		for p in points:
 			id_node=find_node_by_coord(nodes, p["lon"], p["lat"])
 			if id_node == None:
-				print("ERROR find point in nodes! (%f,%f)" % (p["lon"], p["lat"]))
+				print("ERROR find point in nodes! (%s,%s)" % (p["lon"], p["lat"]))
 			else:
 				if id_node not in line["nodes"]:
 # Если тип не установлен (новая линия без точек:)
@@ -424,6 +435,8 @@ def append_line_to_lines(line,points,nodes,lines):
 
 in_file=""
 out_file=""
+source_note_extra=""
+source_tag="survey"
 DEBUG=True
 
 parse_opts()
