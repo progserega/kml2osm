@@ -13,8 +13,8 @@ import os
 #from shapely.geometry.polygon import LinearRing
 
 
-#DEBUG=False
-DEBUG=True
+DEBUG=False
+#DEBUG=True
 
 def write_osm_xml(out_file,nodes,lines):
 	f=open(out_file,"w+")
@@ -57,7 +57,7 @@ def write_osm_xml(out_file,nodes,lines):
 	
 
 def print_help():
-	os.write(2,"""
+	os.write(2,b"""
 This is convertor kml->osm
 	This programm read kml-file (Google Earth geo-data) and write osm-file (OpenStreetMap xml)
 	Use:            
@@ -66,7 +66,8 @@ This is convertor kml->osm
 options: 
 	-i file - input file with kml 
 	-o file - output file with osm
-	-n tag source_note_extra tag
+	-n tag source:note append tag
+	-s --source tag source
 	-d - debug output
 	-h - this help
 need 2 parametr: input and output files.
@@ -116,15 +117,31 @@ def process_folder(root,ns,nodes,lines,note):
 		folder_name_tag=folder.find(ns+"name")
 		if folder_name_tag!=None:
 			folder_name=folder_name_tag.text
+		print("process_folder(): folder_name=",folder_name)
 		# Обрабатываем точки в текущей директории:
 		process_placemark_points(folder,ns,nodes,lines,folder_name,note)
 		# Обрабатываем линии в текущей директории:
 		process_placemark_lines(folder,ns,nodes,lines,folder_name,note)
-
+		# Погружаемся на уровень ниже:
+		process_folder(folder,ns,nodes,lines,folder_name)
+	# Могут быть вложенные документы:
+	for folder in root.findall(ns+"Document"):
+		folder_name=""
+		folder_name_tag=folder.find(ns+"name")
+		if folder_name_tag!=None:
+			folder_name=folder_name_tag.text
+		print("process_folder(): folder_name=",folder_name)
+		# Обрабатываем точки в текущей директории:
+		process_placemark_points(folder,ns,nodes,lines,folder_name,note)
+		# Обрабатываем линии в текущей директории:
+		process_placemark_lines(folder,ns,nodes,lines,folder_name,note)
 		# Погружаемся на уровень ниже:
 		process_folder(folder,ns,nodes,lines,folder_name)
 
+
+
 def process_placemark_points(root,ns,nodes,lines,line_name,note):
+	print("process_placemark_points() line_name=",line_name)
 	for p in root.findall(ns+"Placemark"):
 		tag=p.find(ns+"Point")
 		if tag!=None:
@@ -437,7 +454,6 @@ in_file=""
 out_file=""
 source_note_extra=""
 source_tag="survey"
-DEBUG=True
 
 parse_opts()
 if in_file=='' or out_file=='':
